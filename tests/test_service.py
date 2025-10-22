@@ -69,6 +69,35 @@ def test_register_importer_extends_supported_platforms():
     assert orders[0].platform == "dummy"
 
 
+def test_register_importer_conflict_requires_replace():
+    service = OrderService()
+
+    class AlternativeEtsyImporter(BaseOrderImporter):
+        platform = "etsy"
+
+        def parse_order(self, payload):
+            return Order(
+                id="alt",
+                platform=self.platform,
+                created_at=datetime.fromtimestamp(0, tz=timezone.utc),
+                customer_name="",
+                customer_email="",
+                status="open",
+                currency="USD",
+                total_price=0.0,
+                items=[],
+            )
+
+    importer = AlternativeEtsyImporter()
+
+    with pytest.raises(ValueError):
+        service.register_importer(importer)
+
+    service.register_importer(importer, replace=True)
+    orders = service.import_orders("etsy", [{"receipt_id": "x"}])
+    assert orders[0].id == "alt"
+
+
 def test_report_provides_summary():
     service = OrderService()
     orders = service.import_all(
