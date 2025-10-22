@@ -26,10 +26,28 @@ class OrderService:
                 }
             )
 
-    def register_importer(self, importer: BaseOrderImporter) -> None:
-        """Register an importer instance for a platform."""
+    def register_importer(
+        self, importer: BaseOrderImporter, *, replace: bool = False
+    ) -> None:
+        """Register an importer instance for a platform.
 
-        self.importers[importer.platform.lower()] = importer
+        Parameters
+        ----------
+        importer:
+            The importer instance to register.
+        replace:
+            Whether an existing importer for the same platform should be
+            replaced. If ``False`` and an importer is already registered, a
+            :class:`ValueError` will be raised.
+        """
+
+        key = importer.platform.lower()
+        existing = self.importers.get(key)
+        if existing is not None and existing is not importer and not replace:
+            raise ValueError(
+                f"Importer already registered for platform '{importer.platform}'"
+            )
+        self.importers[key] = importer
 
     def import_orders(
         self, platform: str, raw_orders: Iterable[Mapping[str, object]]
