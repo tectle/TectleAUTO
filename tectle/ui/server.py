@@ -595,19 +595,21 @@ def _parse_etsy_payload(data: bytes) -> Sequence[Mapping[str, object]]:
 
 
 def _extract_form_file(body: bytes, content_type: str, *, field_name: str) -> bytes:
-    if "boundary=" not in content_type:
+    if "boundary=" not in content_type.lower():
         raise ValueError("Missing multipart boundary in Content-Type header")
 
     parser = BytesParser(policy=default_policy)
-    header_bytes = (
-        f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode("utf-8")
-    )
-    message = parser.parsebytes(header_bytes + body)
+    normalized_header = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n"
+    message = parser.parsebytes(normalized_header.encode("utf-8") + body)
 
     if not message.is_multipart():
         raise ValueError("Expected multipart form data payload")
 
     for part in message.iter_parts():
+        disposition = part.get_content_disposition()
+        if disposition != "form-data":
+            continue
+
         params = {
             key: value
             for key, value in part.get_params(header="content-disposition")
@@ -615,6 +617,7 @@ def _extract_form_file(body: bytes, content_type: str, *, field_name: str) -> by
         }
         if params.get("name") != field_name:
             continue
+
         payload = part.get_payload(decode=True)
         if payload is None:
             break

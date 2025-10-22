@@ -79,9 +79,14 @@ python -m tectle.ui --data path/to/orders.json
 
 Filters in the UI allow you to slice by status or platform, inspect item-level
 details, and review the original raw payload for each order. You can also load
-real Etsy exports directly from the dashboard header—choose a JSON file you
-downloaded from Etsy and use the **Import Etsy Orders** button to append those
-orders to the current view.
+real Etsy exports directly from the dashboard header:
+
+1. Click **Import Etsy Orders** in the hero area.
+2. Select the JSON export you downloaded from Etsy.
+3. Submit the form to merge the uploaded orders into the current view.
+
+Only the `payload` field from the multipart form is read, so you can safely
+attach exactly the file you received from Etsy without additional wrapping.
 
 ## Extending to New Platforms
 

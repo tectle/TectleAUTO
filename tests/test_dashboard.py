@@ -62,3 +62,27 @@ def test_extract_form_file_handles_basic_multipart():
 
     extracted = _extract_form_file(body, content_type, field_name="payload")
     assert extracted == b"[{\"receipt_id\": \"1\"}]"
+
+
+def test_extract_form_file_ignores_non_form_parts_and_handles_quotes():
+    boundary = "----boundary"
+    content_type = f"Multipart/Form-Data; Boundary=\"{boundary}\""
+    parts = [
+        "",
+        f"--{boundary}",
+        "Content-Disposition: attachment; name=\"ignored\"; filename=\"readme.txt\"",
+        "Content-Type: text/plain",
+        "",
+        "ignore me",
+        f"--{boundary}",
+        "Content-Disposition: form-data; name=\"payload\"; filename=\"orders.json\"",
+        "Content-Type: application/json",
+        "",
+        "[{\"receipt_id\": \"2\"}]",
+        f"--{boundary}--",
+        "",
+    ]
+    body = "\r\n".join(parts).encode("utf-8")
+
+    extracted = _extract_form_file(body, content_type, field_name="payload")
+    assert extracted == b"[{\"receipt_id\": \"2\"}]"
