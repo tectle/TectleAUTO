@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Iterable, List, Mapping, MutableMapping, Optional, Sequence
 from urllib.parse import parse_qs, urlencode, urlparse
 
-import cgi
+from email.parser import BytesParser
+from email.policy import default as default_policy
 
 from tectle.orders.models import Order
 from tectle.orders.organizer import OrderOrganizer, OrderSummary
@@ -520,28 +521,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_error(400, "Expected multipart form data")
             return
 
-        environ = {
-            "REQUEST_METHOD": "POST",
-            "CONTENT_TYPE": content_type,
-            "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-        }
-        form = cgi.FieldStorage(  # type: ignore[call-arg]
-            fp=self.rfile,
-            headers=self.headers,
-            environ=environ,
-            keep_blank_values=False,
-        )
-
-        if "payload" not in form:
-            self.send_error(400, "Missing Etsy payload upload")
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:  # pragma: no cover - defensive guard
+            self.send_error(400, "Invalid Content-Length header")
             return
 
-        file_item = form["payload"]
-        if not getattr(file_item, "file", None):
-            self.send_error(400, "Invalid Etsy payload upload")
+        body = self.rfile.read(content_length)
+        try:
+            payload_bytes = _extract_form_file(body, content_type, field_name="payload")
+        except ValueError as exc:
+            self.send_error(400, str(exc))
             return
 
-        payload_bytes = file_item.file.read()
         try:
             raw_orders = _parse_etsy_payload(payload_bytes)
         except ValueError as exc:  # pragma: no cover - defensive guard
@@ -600,6 +592,35 @@ def _parse_etsy_payload(data: bytes) -> Sequence[Mapping[str, object]]:
         return _ensure_mappings(parsed)
 
     raise ValueError("Unexpected Etsy payload structure")
+
+
+def _extract_form_file(body: bytes, content_type: str, *, field_name: str) -> bytes:
+    if "boundary=" not in content_type:
+        raise ValueError("Missing multipart boundary in Content-Type header")
+
+    parser = BytesParser(policy=default_policy)
+    header_bytes = (
+        f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode("utf-8")
+    )
+    message = parser.parsebytes(header_bytes + body)
+
+    if not message.is_multipart():
+        raise ValueError("Expected multipart form data payload")
+
+    for part in message.iter_parts():
+        params = {
+            key: value
+            for key, value in part.get_params(header="content-disposition")
+            if key
+        }
+        if params.get("name") != field_name:
+            continue
+        payload = part.get_payload(decode=True)
+        if payload is None:
+            break
+        return payload
+
+    raise ValueError(f"Missing form field '{field_name}' in upload")
 
 
 def launch_dashboard(

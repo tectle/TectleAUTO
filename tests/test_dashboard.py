@@ -1,6 +1,6 @@
 from tectle.orders.service import OrderService
 from tectle.ui.sample_data import load_sample_payloads
-from tectle.ui.server import _parse_etsy_payload, render_dashboard
+from tectle.ui.server import _extract_form_file, _parse_etsy_payload, render_dashboard
 
 
 def _load_orders():
@@ -43,3 +43,22 @@ def test_parse_etsy_payload_accepts_wrapped_mapping():
     data = b"{\"etsy\": [{\"receipt_id\": \"99\"}]}"
     parsed = _parse_etsy_payload(data)
     assert parsed[0]["receipt_id"] == "99"
+
+
+def test_extract_form_file_handles_basic_multipart():
+    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+    content_type = f"multipart/form-data; boundary={boundary}"
+    parts = [
+        "",
+        f"--{boundary}",
+        "Content-Disposition: form-data; name=\"payload\"; filename=\"orders.json\"",
+        "Content-Type: application/json",
+        "",
+        "[{\"receipt_id\": \"1\"}]",
+        f"--{boundary}--",
+        "",
+    ]
+    body = "\r\n".join(parts).encode("utf-8")
+
+    extracted = _extract_form_file(body, content_type, field_name="payload")
+    assert extracted == b"[{\"receipt_id\": \"1\"}]"
