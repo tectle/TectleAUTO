@@ -61,6 +61,28 @@ print(report)
 The example above demonstrates importing raw order payloads from Etsy and
 Shopify, unifying them into the shared model, and producing a summary report.
 
+## HTML Dashboard
+
+Spin up a lightweight HTML dashboard to browse orders and their details:
+
+```bash
+python -m tectle.ui
+```
+
+By default the dashboard launches on <http://127.0.0.1:8000> with curated sample
+data. Point it at your own payloads by supplying a JSON file that mirrors the
+structure expected by `OrderService.import_all`:
+
+```bash
+python -m tectle.ui --data path/to/orders.json
+```
+
+Filters in the UI allow you to slice by status or platform, inspect item-level
+details, and review the original raw payload for each order. You can also load
+real Etsy exports directly from the dashboard header—choose a JSON file you
+downloaded from Etsy and use the **Import Etsy Orders** button to append those
+orders to the current view.
+
 ## Extending to New Platforms
 
 To add support for another platform, subclass `BaseOrderImporter`, implement the
